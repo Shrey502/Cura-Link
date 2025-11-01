@@ -14,6 +14,7 @@ const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
 const searchRoutes = require('./routes/search');
 const favoritesRoutes = require('./routes/favorites');
+const forumRoutes = require('./routes/forums');
 
 // --- 3. Use Routes ---
 // Note: We changed the URLs to be simpler!
@@ -21,6 +22,7 @@ app.use('/api', authRoutes); // e.g., /api/register
 app.use('/api/profile', profileRoutes); // e.g., /api/profile/patient
 app.use('/api/search', searchRoutes); // e.g., /api/search/publications
 app.use('/api/favorites', favoritesRoutes); // e.g., /api/favorites
+app.use('/api/forums', forumRoutes); // e.g., /api/forums
 
 // --- 4. Simple Test Route ---
 app.get('/api/test-db', async (req, res) => {
