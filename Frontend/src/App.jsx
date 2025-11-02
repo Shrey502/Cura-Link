@@ -39,6 +39,7 @@ function App() {
             <>
               <Link to="/dashboard/researcher" style={{ marginRight: '1rem' }}>My Dashboard</Link>
               <Link to="/manage-trials" style={{ marginRight: '1rem' }}>Manage Trials</Link>
+              <Link to="/favorites" style={{ marginRight: '1rem' }}>My Favorites</Link>
             </>
           )}
         </div>

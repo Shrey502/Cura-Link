@@ -1,24 +1,63 @@
 // src/pages/ResearcherDashboard.jsx
 import React, { useState, useEffect } from 'react';
-import api from '../api'; // Import our api helper
+import { useNavigate } from 'react-router-dom';
+import api from '../api';
+import ContactModal from '../components/ContactModal';
+
+// --- SessionStorage Keys (for state persistence) ---
+const SESSION_KEYS = {
+  COLLAB_SEARCH_TERM: 'rd_collabSearchTerm',
+  COLLABORATORS: 'rd_collaborators',
+  CATEGORIES: 'rd_categories',
+  SELECTED_CATEGORY: 'rd_selectedCategory',
+  POSTS: 'rd_posts',
+  SELECTED_POST: 'rd_selectedPost',
+  REPLIES: 'rd_replies',
+  PENDING_REQUESTS: 'rd_pendingRequests',
+  ACCEPTED_COLLABS: 'rd_acceptedCollabs',
+  SENT_REQUESTS: 'rd_sentRequests',
+};
+
+// --- Helper function to get state from sessionStorage ---
+const getInitialState = (key, defaultValue) => {
+  const storedValue = sessionStorage.getItem(key);
+  if (storedValue) {
+    try {
+      return JSON.parse(storedValue);
+    } catch (e) {
+      console.error(`Failed to parse sessionStorage key "${key}":`, e);
+      return defaultValue;
+    }
+  }
+  return defaultValue;
+};
+
 
 function ResearcherDashboard() {
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
   
-  // Forum State
-  const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [posts, setPosts] = useState([]);
-  const [selectedPost, setSelectedPost] = useState(null);
-  const [replies, setReplies] = useState([]);
+  // --- UPDATED: State now loads from sessionStorage ---
+  const [categories, setCategories] = useState(() => getInitialState(SESSION_KEYS.CATEGORIES, []));
+  const [selectedCategory, setSelectedCategory] = useState(() => getInitialState(SESSION_KEYS.SELECTED_CATEGORY, null));
+  const [posts, setPosts] = useState(() => getInitialState(SESSION_KEYS.POSTS, []));
+  const [selectedPost, setSelectedPost] = useState(() => getInitialState(SESSION_KEYS.SELECTED_POST, null));
+  const [replies, setReplies] = useState(() => getInitialState(SESSION_KEYS.REPLIES, []));
   const [replyBody, setReplyBody] = useState('');
 
-  // Collaborator State
-  const [collabSearchTerm, setCollabSearchTerm] = useState('');
-  const [collaborators, setCollaborators] = useState([]);
+  const [collabSearchTerm, setCollabSearchTerm] = useState(() => getInitialState(SESSION_KEYS.COLLAB_SEARCH_TERM, ''));
+  const [collaborators, setCollaborators] = useState(() => getInitialState(SESSION_KEYS.COLLABORATORS, []));
+  
+  // --- NEW: Connection & Chat State ---
+  const [pendingRequests, setPendingRequests] = useState(() => getInitialState(SESSION_KEYS.PENDING_REQUESTS, []));
+  const [acceptedCollabs, setAcceptedCollabs] = useState(() => getInitialState(SESSION_KEYS.ACCEPTED_COLLABS, []));
+  const [sentRequests, setSentRequests] = useState(() => getInitialState(SESSION_KEYS.SENT_REQUESTS, []));
+  
+  const [toastMessage, setToastMessage] = useState('');
+  const [connectRequest, setConnectRequest] = useState(null); 
 
-  // --- 1. Fetch Profile on Page Load ---
+  // --- 1. Fetch ALL data on page load ---
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -29,46 +68,81 @@ function ResearcherDashboard() {
         setError('Could not fetch your profile.');
       }
     };
-
-    // --- 2. Fetch Forum Categories on Page Load ---
+    
     const fetchCategories = async () => {
+      if (categories.length > 0) return; // Don't refetch if we have it
       try {
         const response = await api.get('/forums');
         setCategories(response.data);
+        sessionStorage.setItem(SESSION_KEYS.CATEGORIES, JSON.stringify(response.data));
       } catch (err) {
         console.error('Failed to fetch categories', err);
       }
     };
 
+    // --- NEW: Fetch Pending and Accepted Connections ---
+    const fetchConnections = async () => {
+      try {
+        const [pendingRes, acceptedRes] = await Promise.all([
+          api.get('/connections/pending'),
+          api.get('/connections/accepted')
+        ]);
+        
+        setPendingRequests(pendingRes.data);
+        sessionStorage.setItem(SESSION_KEYS.PENDING_REQUESTS, JSON.stringify(pendingRes.data));
+        
+        setAcceptedCollabs(acceptedRes.data);
+        sessionStorage.setItem(SESSION_KEYS.ACCEPTED_COLLABS, JSON.stringify(acceptedRes.data));
+        
+      } catch (err) {
+        console.error('Failed to fetch connections', err);
+      }
+    };
+
     fetchProfile();
     fetchCategories();
+    fetchConnections();
   }, []); // Runs once on page load
 
-  // --- 3. Fetch Posts when a Category is Clicked ---
+  // --- 2. Forum Handlers (UPDATED to save state) ---
   const handleCategoryClick = async (categoryId) => {
     setSelectedCategory(categoryId);
-    setSelectedPost(null); // Clear old post
-    setReplies([]); // Clear old replies
+    sessionStorage.setItem(SESSION_KEYS.SELECTED_CATEGORY, JSON.stringify(categoryId));
+    
+    setSelectedPost(null);
+    sessionStorage.removeItem(SESSION_KEYS.SELECTED_POST);
+    
+    setReplies([]);
+    sessionStorage.removeItem(SESSION_KEYS.REPLIES); 
+    
     try {
       const response = await api.get(`/forums/posts/${categoryId}`);
       setPosts(response.data);
+      sessionStorage.setItem(SESSION_KEYS.POSTS, JSON.stringify(response.data));
     } catch (err) {
       console.error('Failed to fetch posts', err);
     }
   };
 
-  // --- 4. Fetch Replies when a Post is Clicked ---
   const handlePostClick = async (postId) => {
-    setSelectedPost(postId);
-    try {
-      const response = await api.get(`/forums/replies/${postId}`);
-      setReplies(response.data);
-    } catch (err) {
-      console.error('Failed to fetch replies', err);
+    if (selectedPost === postId) {
+      setSelectedPost(null);
+      sessionStorage.removeItem(SESSION_KEYS.SELECTED_POST);
+      setReplies([]);
+      sessionStorage.removeItem(SESSION_KEYS.REPLIES);
+    } else {
+      setSelectedPost(postId);
+      sessionStorage.setItem(SESSION_KEYS.SELECTED_POST, JSON.stringify(postId));
+      try {
+        const response = await api.get(`/forums/replies/${postId}`);
+        setReplies(response.data);
+        sessionStorage.setItem(SESSION_KEYS.REPLIES, JSON.stringify(response.data));
+      } catch (err) {
+        console.error('Failed to fetch replies', err);
+      }
     }
   };
 
-  // --- 5. Handle Submitting a New Reply ---
   const handleReplySubmit = async (e) => {
     e.preventDefault();
     try {
@@ -76,144 +150,319 @@ function ResearcherDashboard() {
         body: replyBody,
         postId: selectedPost,
       });
-      // Add new reply to the list instantly
-      setReplies([...replies, response.data]);
-      setReplyBody(''); // Clear the input box
+      const newReplies = [...replies, response.data];
+      setReplies(newReplies);
+      sessionStorage.setItem(SESSION_KEYS.REPLIES, JSON.stringify(newReplies));
+      setReplyBody('');
     } catch (err) {
       console.error('Failed to post reply', err);
     }
   };
   
-  // --- 6. Handle Collaborator Search ---
+  // --- 3. Collaborator & Connection Handlers (UPDATED) ---
+  const showToast = (message) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(''), 1500);
+  };
+  
+  const handleCollabSearchTermChange = (e) => {
+    setCollabSearchTerm(e.target.value);
+    sessionStorage.setItem(SESSION_KEYS.COLLAB_SEARCH_TERM, JSON.stringify(e.target.value));
+  };
+
   const handleSearchCollaborators = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      // We re-use the same /api/search/experts endpoint!
       const response = await api.post('/search/experts', { searchTerm: collabSearchTerm });
-  
-      // Filter out ourself from the results
-      const otherResearchers = response.data.filter(r => r.user_id !== profile.user_id);
+      // Filter out ourself, and anyone we're already connected to
+      const myCollabIds = acceptedCollabs.map(c => c.collaborator_id);
+      const otherResearchers = response.data.filter(
+        r => r.user_id !== profile.user_id && !myCollabIds.includes(r.user_id)
+      );
       setCollaborators(otherResearchers);
-  
+      sessionStorage.setItem(SESSION_KEYS.COLLABORATORS, JSON.stringify(otherResearchers));
     } catch (err) {
       console.error('Collaborator search failed', err);
       setError('Search for collaborators failed.');
+    }
+  };
+  
+  const handleFavorite = async (itemId) => {
+    try {
+      await api.post('/favorites', { itemId, itemType: 'EXPERT' });
+      showToast('Added to favorites!');
+    } catch (err) {
+      console.error('Failed to add favorite', err);
+      if (err.response && err.response.status === 409) {
+        showToast('Item is already in your favorites.');
+      } else {
+        showToast('Could not add to favorites.');
+      }
+    }
+  };
+  
+  // --- UPDATED: Connect Request (now calls API) ---
+  const handleConnectRequest = (researcherName, researcherId) => {
+    setConnectRequest({ name: researcherName, id: researcherId }); 
+  };
+  
+  const confirmConnectRequest = async () => {
+    try {
+      await api.post('/connections/request', { recipientId: connectRequest.id });
+      showToast(`Connection request sent to ${connectRequest.name}!`);
+      
+      const newSentRequests = [...sentRequests, connectRequest.id];
+      setSentRequests(newSentRequests);
+      sessionStorage.setItem(SESSION_KEYS.SENT_REQUESTS, JSON.stringify(newSentRequests));
+    } catch (err) {
+      console.error('Failed to send request', err);
+      if (err.response && err.response.status === 409) {
+        showToast('Request already sent.');
+        // Add to sent requests even if it failed (as it's already sent)
+        const newSentRequests = [...sentRequests, connectRequest.id];
+        setSentRequests(newSentRequests);
+        sessionStorage.setItem(SESSION_KEYS.SENT_REQUESTS, JSON.stringify(newSentRequests));
+      } else {
+        showToast('Failed to send request.');
+      }
+    } finally {
+      setConnectRequest(null);
+    }
+  };
+
+  // --- NEW: Respond to a connection request ---
+  const handleRequestResponse = async (requestId, response) => {
+    try {
+      await api.put('/connections/respond', { requestId, response });
+      
+      // Remove from pending list
+      const newPending = pendingRequests.filter(req => req.id !== requestId);
+      setPendingRequests(newPending);
+      sessionStorage.setItem(SESSION_KEYS.PENDING_REQUESTS, JSON.stringify(newPending));
+
+      // If accepted, fetch accepted collabs again to update the list
+      if (response === 'ACCEPTED') {
+        const acceptedRes = await api.get('/connections/accepted');
+        setAcceptedCollabs(acceptedRes.data);
+        sessionStorage.setItem(SESSION_KEYS.ACCEPTED_COLLABS, JSON.stringify(acceptedRes.data));
+      }
+
+      showToast(`Request ${response.toLowerCase()}.`);
+    } catch (err) {
+      console.error('Failed to respond to request', err);
+      showToast('Failed to respond to request.');
+    }
+  };
+
+  // --- NEW: Start a chat ---
+  const handleStartChat = async (collaboratorId, collaboratorName) => {
+    try {
+      // Create or get the chat room
+      const response = await api.post('/chat/rooms', { otherUserId: collaboratorId });
+      const room = response.data;
+      
+      // Navigate to the chat page, passing room info
+      navigate('/chat', { state: { roomId: room.id, roomName: collaboratorName } });
+    } catch (err) {
+      console.error('Failed to start chat', err);
+      showToast('Could not start chat.');
     }
   };
 
   if (!profile) return <div>Loading your profile...</div>;
 
   return (
-    <div className="dashboard">
-      {/* --- COLUMN 1: PROFILE & FORUM NAVIGATION --- */}
-      <div className="search-column">
-        <h2>Welcome, {profile.full_name}</h2>
-        <p>Your specialties: <strong>{profile.specialties?.join(', ')}</strong></p>
-        
-        {/* --- NEW: Collaborator Search Form --- */}
-        <div className="search-box" style={{ marginTop: '2rem' }}>
-          <h3>Search Collaborators</h3>
-          <form onSubmit={handleSearchCollaborators}>
-            <input
-              type="text"
-              placeholder="e.g., Oncology"
-              value={collabSearchTerm}
-              onChange={(e) => setCollabSearchTerm(e.target.value)}
-            />
-            <button type="submit">Search</button>
-          </form>
+    <>
+      {/* --- Popups & Modals --- */}
+      {toastMessage && (
+        <div className="toast-backdrop">
+          <div className="toast-box">{toastMessage}</div>
         </div>
+      )}
+      
+      {connectRequest && (
+        <ContactModal 
+          title="Send Connection Request"
+          message={`Are you sure you want to send a connection request to ${connectRequest.name}?`}
+          onConfirm={confirmConnectRequest}
+          onCancel={() => setConnectRequest(null)}
+        />
+      )}
+      
+      {/* --- Main Dashboard --- */}
+      <div className="dashboard">
+        {/* --- COLUMN 1: PROFILE, CONNECTIONS, FORUM NAV --- */}
+        <div className="search-column">
+          <h2>Welcome, {profile.full_name}</h2>
+          <p>Your specialties: <strong>{profile.specialties?.join(', ')}</strong></p>
+          
+          {/* --- NEW: Pending Requests Section --- */}
+          <div className="search-box" style={{ marginTop: '2rem' }}>
+            <h3>Pending Connection Requests</h3>
+            {pendingRequests.length === 0 ? (
+              <p>No new requests.</p>
+            ) : (
+              pendingRequests.map(req => (
+                <div key={req.id} className="result-item" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                  <span><strong>{req.requester_name}</strong> wants to connect.</span>
+                  <div>
+                    <button onClick={() => handleRequestResponse(req.id, 'ACCEPTED')} style={{ background: '#28a745', fontSize: '0.8rem', padding: '0.25rem 0.5rem', marginRight: '0.5rem' }}>Accept</button>
+                    <button onClick={() => handleRequestResponse(req.id, 'REJECTED')} style={{ background: '#dc3545', fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}>Reject</button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
 
-        <hr style={{ margin: '2rem 0' }} />
+          <div className="search-box" style={{ marginTop: '2rem' }}>
+            <h3>Search Collaborators</h3>
+            <form onSubmit={handleSearchCollaborators}>
+              <input
+                type="text"
+                placeholder="e.g., Oncology"
+                value={collabSearchTerm}
+                onChange={handleCollabSearchTermChange}
+              />
+              <button type="submit">Search</button>
+            </form>
+          </div>
+          
+          {error && <p style={{ color: 'red' }}>{error}</p>}
 
-        <h3>Forum Management</h3>
-        <h4>Categories</h4>
-        <div>
-          {categories.map((cat) => (
-            <button 
-              key={cat.id} 
-              onClick={() => handleCategoryClick(cat.id)}
-              style={{ marginRight: '0.5rem', marginBottom: '0.5rem' }}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
+          <hr style={{ margin: '2rem 0' }} />
 
-        <h4 style={{ marginTop: '1.5rem' }}>Patient Questions</h4>
-        <div>
-          {posts.length > 0 ? (
-            posts.map((post) => (
-              <div 
-                key={post.id} 
-                onClick={() => handlePostClick(post.id)}
-                className="result-item"
-                style={{ cursor: 'pointer', background: selectedPost === post.id ? '#eef' : '#fff' }}
+          <h3>Forum Management</h3>
+          <h4>Categories</h4>
+          <div>
+            {categories.map((cat) => (
+              <button 
+                key={cat.id} 
+                onClick={() => handleCategoryClick(cat.id)}
+                style={{ marginRight: '0.5rem', marginBottom: '0.5rem', background: selectedCategory === cat.id ? '#007bff' : '#eee', color: selectedCategory === cat.id ? '#fff' : '#000' }}
               >
-                <strong>{post.title}</strong>
-                <br />
-                <small>Asked by: {post.full_name}</small>
+                {cat.name}
+              </button>
+            ))}
+          </div>
+
+          <h4 style={{ marginTop: '1.5rem' }}>Patient Questions</h4>
+          <div>
+            {posts.length > 0 ? (
+              posts.map((post) => (
+                <div 
+                  key={post.id} 
+                  onClick={() => handlePostClick(post.id)}
+                  className="result-item"
+                  style={{ cursor: 'pointer', background: selectedPost === post.id ? '#eef' : '#fff' }}
+                >
+                  <strong>{post.title}</strong>
+                  <br />
+                  <small>Asked by: {post.full_name}</small>
+                </div>
+              ))
+            ) : (
+              <p>{selectedCategory ? 'No questions in this category yet.' : 'Select a category to see questions.'}</p>
+            )}
+          </div>
+        </div>
+
+        {/* --- COLUMN 2: COLLABORATORS & FORUM REPLIES --- */}
+        <div className="results-column">
+          {/* --- NEW: My Collaborators List --- */}
+          <h3>My Collaborators</h3>
+          {acceptedCollabs.length > 0 ? (
+            acceptedCollabs.map((collab) => (
+              <div key={collab.collaborator_id} className="result-item">
+                <h4>{collab.collaborator_name}</h4>
+                <button 
+                  onClick={() => handleStartChat(collab.collaborator_id, collab.collaborator_name)}
+                  style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
+                >
+                  Chat
+                </button>
               </div>
             ))
           ) : (
-            <p>Select a category to see questions.</p>
+            <p>No collaborators yet. Find them in the search below.</p>
+          )}
+
+          <hr style={{ margin: '2rem 0' }} />
+          
+          <h3>Collaborator Search Results</h3>
+          {collaborators.length > 0 ? (
+            collaborators.map((expert) => (
+              <div key={expert.user_id} className="result-item">
+                <h4>{expert.full_name}</h4>
+                <p><strong>Specialties:</strong> {expert.specialties?.join(', ')}</p>
+                <p><strong>Interests:</strong> {expert.research_interests?.join(', ')}</p>
+                
+                <button 
+                  onClick={() => handleFavorite(expert.user_id)}
+                  style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', background: '#6c757d' }}
+                >
+                  + Favorite
+                </button>
+
+                {sentRequests.includes(expert.user_id) ? (
+                  <button 
+                    style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', background: '#6c757d', marginLeft: '0.5rem', cursor: 'not-allowed' }}
+                    disabled
+                  >
+                    Request Sent
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => handleConnectRequest(expert.full_name, expert.user_id)}
+                    style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', background: '#007bff', marginLeft: '0.5rem' }}
+                  >
+                    Connect
+                  </button>
+                )}
+              </div>
+            ))
+          ) : (
+            <p>No collaborators found. Try a new search.</p>
+          )}
+
+          <hr style={{ margin: '2rem 0' }} />
+          
+          <h3>Question & Answers</h3>
+          {!selectedPost && <p>Select a question to see the discussion.</p>}
+
+          {selectedPost && (
+            <div>
+              {/* Find the original post title */}
+              <h4>{posts.find(p => p.id === selectedPost)?.title}</h4>
+              <p style={{ fontStyle: 'italic' }}>{posts.find(p => p.id === selectedPost)?.body}</p>
+              <hr />
+              {replies.map((reply) => (
+                <div key={reply.id} className="result-item" style={{ background: '#f9f9f9' }}>
+                  <p>{reply.body}</p>
+                  <small>Answered by: {reply.full_name}</small>
+                </div>
+              ))}
+              
+              <form onSubmit={handleReplySubmit} style={{ marginTop: '1.5rem' }}>
+                <h4>Your Answer</h4>
+                <textarea
+                  value={replyBody}
+                  onChange={(e) => setReplyBody(e.target.value)}
+                  rows="5"
+                  required
+                  style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
+                />
+                <button type="submit" style={{ marginTop: '0.5rem' }}>
+                  Post Reply
+                </button>
+              </form>
+            </div>
           )}
         </div>
       </div>
-
-      {/* --- COLUMN 2: COLLABORATORS, REPLIES & ANSWER BOX --- */}
-      <div className="results-column">
-
-        {/* --- NEW: Collaborator Results --- */}
-        <h3>Collaborator Results</h3>
-        {collaborators.length > 0 ? (
-          collaborators.map((expert) => (
-            <div key={expert.user_id} className="result-item">
-              <h4>{expert.full_name}</h4>
-              <p><strong>Specialties:</strong> {expert.specialties?.join(', ')}</p>
-              <p><strong>Interests:</strong> {expert.research_interests?.join(', ')}</p>
-            </div>
-          ))
-        ) : (
-          <p>No collaborators found. Try a new search.</p>
-        )}
-
-        <hr style={{ margin: '2rem 0' }} />
-        
-        {/* --- Forum Section --- */}
-        <h3>Question & Answers</h3>
-        {!selectedPost && <p>Select a question to see the discussion.</p>}
-
-        {/* Show all replies for the selected post */}
-        {selectedPost && (
-          <div>
-            {replies.map((reply) => (
-              <div key={reply.id} className="result-item" style={{ background: '#f9f9fT9' }}>
-                <p>{reply.body}</p>
-                <small>Answered by: {reply.full_name}</small>
-              </div>
-            ))}
-            
-            {/* Reply Form */}
-            <form onSubmit={handleReplySubmit} style={{ marginTop: '1.5rem' }}>
-              <h4>Your Answer</h4>
-              <textarea
-                value={replyBody}
-                onChange={(e) => setReplyBody(e.target.value)}
-                rows="5"
-                required
-                style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
-              />
-              <button type="submit" style={{ marginTop: '0.5rem' }}>
-                Post Reply
-              </button>
-            </form>
-          </div>
-        )}
-      </div>
-    </div>
+    </>
   );
 }
 
 export default ResearcherDashboard;
+

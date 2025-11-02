@@ -1,7 +1,8 @@
+// src/pages/LoginPage.jsx
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import api from '../api'; // Need this for profile check
+import api from '../api'; // Import the api helper
 
 function LoginPage() {
   const [email, setEmail] = useState('');
@@ -24,15 +25,20 @@ function LoginPage() {
 
       // 2. Save token and user info
       localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('user', JSON.stringify(user)); // Store user info
 
-      // 3. --- NEW LOGIC: Check Profile Completion ---
+      console.log('Login successful:', user);
+
+      // 3. --- THIS IS THE UPDATED ONBOARDING LOGIC ---
       if (user.role === 'PATIENT') {
+        // We're logged in, so we can use our 'api' helper
         try {
+          // Check the profile to see if it's complete
           const profileResponse = await api.get('/profile/patient');
           const profile = profileResponse.data.profile;
 
-          if (!profile.conditions || profile.conditions.length === 0) {
+          // Check if conditions are missing. 'conditions' is a JSONB array.
+          if (profile.conditions === null || profile.conditions === '[]' || (Array.isArray(profile.conditions) && profile.conditions.length === 0)) {
             // Profile is incomplete! Send to patient onboarding.
             navigate('/onboarding/patient');
           } else {
@@ -40,30 +46,30 @@ function LoginPage() {
             navigate('/dashboard/patient');
           }
         } catch (profileError) {
-          console.error("Could not fetch patient profile after login", profileError);
-          navigate('/onboarding/patient'); 
+          // If profile doesn't exist (404), it's incomplete.
+          navigate('/onboarding/patient');
         }
+      
       } else if (user.role === 'RESEARCHER') {
         try {
           const profileResponse = await api.get('/profile/researcher');
           const profile = profileResponse.data.profile;
 
-          if (profile.specialties === null || profile.specialties.length === 0) {
-            // Profile is incomplete! Send to researcher onboarding.
+          // Check if specialties are missing
+          if (profile.specialties === null || profile.specialties === '[]' || (Array.isArray(profile.specialties) && profile.specialties.length === 0)) {
             navigate('/onboarding/researcher');
           } else {
-            // Profile is complete. Send to dashboard.
             navigate('/dashboard/researcher');
           }
         } catch (profileError) {
-          console.error("Could not fetch researcher profile after login", profileError);
-          navigate('/onboarding/researcher'); 
+          // If profile doesn't exist (404), it's incomplete.
+          navigate('/onboarding/researcher');
         }
       }
     } catch (err) {
       console.error('Login failed:', err);
       if (err.response && err.response.data.error) {
-        setError(err.response.data.error);
+        setError(err.response.data.error); // "Invalid credentials"
       } else {
         setError('Login failed. Please try again.');
       }
@@ -74,7 +80,7 @@ function LoginPage() {
     <div style={{ padding: '2rem', maxWidth: '400px', margin: 'auto' }}>
       <h1>Login</h1>
       <form onSubmit={handleSubmit}>
-        {/* ... (rest of form JSX) ... */}
+        {/* Email Input */}
         <div style={{ marginBottom: '1rem' }}>
           <label>Email:</label>
           <input
@@ -82,10 +88,11 @@ function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={{ width: '100%' }}
+            style={{ width: '100%', boxSizing: 'border-box' }}
           />
         </div>
 
+        {/* Password Input */}
         <div style={{ marginBottom: '1rem' }}>
           <label>Password:</label>
           <input
@@ -93,10 +100,11 @@ function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            style={{ width: '100%' }}
+            style={{ width: '100%', boxSizing: 'border-box' }}
           />
         </div>
 
+        {/* Show error message if it exists */}
         {error && <p style={{ color: 'red' }}>{error}</p>}
 
         <button type="submit" style={{ padding: '0.5rem 1rem' }}>
@@ -108,3 +116,4 @@ function LoginPage() {
 }
 
 export default LoginPage;
+

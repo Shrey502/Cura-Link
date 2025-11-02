@@ -90,42 +90,62 @@ router.post('/publications', authenticateToken, async (req, res) => {
   }
 });
 
-// --- Search Clinical Trials (FIXED v2 API) ---
+// --- Search Clinical Trials (FIXED FIELD NAME) ---
 router.post('/trials', authenticateToken, async (req, res) => {
-  const { searchTerm } = req.body;
+  const { searchTerm, statusFilter } = req.body;
   if (!searchTerm) {
     return res.status(400).json({ error: 'searchTerm is required' });
   }
+
   const trialsUrl = 'https://clinicaltrials.gov/api/v2/studies';
+
   try {
     console.log(`Searching ClinicalTrials.gov for: ${searchTerm}`);
-    const searchResponse = await axios.get(trialsUrl, {
-      params: {
-        'query.term': searchTerm,
-        'fields': 'NCTId,BriefTitle,BriefSummary,OverallStatus,LocationCity,LocationCountry',
-        'format': 'json',
-        'pageSize': 5
-      }
-    });
+    
+    const apiParams = {
+      'query.term': searchTerm,
+      // --- THIS IS THE FIX ---
+      'fields': 'NCTId,BriefTitle,BriefSummary,OverallStatus,LocationCity,LocationCountry,CentralContactEMail',
+      // --- END OF FIX ---
+      'format': 'json',
+      'pageSize': 5
+    };
+
+    if (statusFilter && statusFilter !== 'ALL') {
+      apiParams['filter.overallStatus'] = statusFilter.toUpperCase(); 
+    }
+
+    const searchResponse = await axios.get(trialsUrl, { params: apiParams });
+    
     const studies = searchResponse.data.studies;
     if (!studies || studies.length === 0) {
       return res.status(404).json({ message: 'No clinical trials found.' });
     }
+
     let trials = [];
+
     for (const study of studies) {
       const trialId = study.protocolSection.identificationModule.nctId;
       const title = study.protocolSection.identificationModule.briefTitle;
       const summary = study.protocolSection.descriptionModule.briefSummary;
       const status = study.protocolSection.statusModule.overallStatus;
+      
       const locations = study.protocolSection.contactsLocationsModule.locations;
       let locationString = 'N/A';
       if (locations && locations.length > 0) {
           locationString = `${locations[0].city}, ${locations[0].country}`;
       }
+      
+      // --- THIS IS THE FIX ---
+      const email = study.protocolSection.contactsLocationsModule.centralContacts?.[0]?.eMail || 'N/A';
+      // --- END OF FIX ---
+
       if (!summary) continue;
+
       console.log(`Summarizing trial: ${trialId}`);
       const hfUrl = 'https://api-inference.huggingface.co/models/facebook/bart-large-cnn';
       let aiSummary = "Summary not available.";
+
       try {
         const aiResponse = await axios.post(
           hfUrl,
@@ -136,6 +156,7 @@ router.post('/trials', authenticateToken, async (req, res) => {
       } catch (aiError) {
         console.error(`AI summarization failed for ${trialId}:`, aiError.message);
       }
+
       const trial = {
         id: trialId,
         title: title,
@@ -143,10 +164,12 @@ router.post('/trials', authenticateToken, async (req, res) => {
         ai_summary: aiSummary,
         status: status,
         location: locationString,
-        contact_email: 'N/A',
+        contact_email: email,
         trial_url: `https://clinicaltrials.gov/study/${trialId}`
       };
+      
       trials.push(trial);
+
       try {
         const saveQuery = `
           INSERT INTO clinical_trials (id, title, description, ai_summary, status, location, contact_email, trial_url)
@@ -161,49 +184,49 @@ router.post('/trials', authenticateToken, async (req, res) => {
         console.error(`Database save failed for ${trial.id}:`, dbError.message);
       }
     }
+
     res.status(200).json(trials);
+
   } catch (err) {
-    if (err.response && err.response.status === 404) {
-      console.error("API endpoint returned 404. Check URL.", err.config.url);
-      return res.status(500).json({ error: "Trial search service is configured incorrectly." });
+    if (err.response && err.response.status === 400) {
+      console.error("API returned 400. Bad Request. Check params.", err.response.data);
+      return res.status(500).json({ error: "Trial search service failed. Bad parameters." });
     }
     console.error(err);
     res.status(500).json({ error: 'Server error fetching trials' });
   }
 });
 
-// routes/search.js
-
-// ... (keep your existing '/publications' and '/trials' routes) ...
-
 // --- Search Health Experts (Researchers) ---
 router.post('/experts', authenticateToken, async (req, res) => {
-    const { searchTerm } = req.body;
-    if (!searchTerm) {
-      return res.status(400).json({ error: 'searchTerm is required' });
-    }
-  
-    try {
-      // We'll search for the term in the full_name, specialties, or research_interests
-      // The 'ilike' command is case-insensitive
-      // The '->>' operator is for searching inside JSONB text
-      const query = `
-        SELECT user_id, full_name, specialties, research_interests
-        FROM researcher_profiles
-        WHERE 
-          full_name ILIKE $1 OR
-          specialties::text ILIKE $1 OR
-          research_interests::text ILIKE $1;
-      `;
-      
-      // Add '%' wildcards for a "contains" search
-      const results = await db.query(query, [`%${searchTerm}%`]);
-      
-      res.status(200).json(results.rows);
-  
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Server error fetching experts' });
-    }
-  });
+  const { searchTerm } = req.body;
+  if (!searchTerm) {
+    return res.status(400).json({ error: 'searchTerm is required' });
+  }
+
+  try {
+    // We'll search for the term in the full_name, specialties, or research_interests
+    // The 'ilike' command is case-insensitive
+    // The '->>' operator is for searching inside JSONB text
+    const query = `
+      SELECT user_id, full_name, specialties, research_interests
+      FROM researcher_profiles
+      WHERE 
+        full_name ILIKE $1 OR
+        specialties::text ILIKE $1 OR
+        research_interests::text ILIKE $1;
+    `;
+    
+    // Add '%' wildcards for a "contains" search
+    const results = await db.query(query, [`%${searchTerm}%`]);
+    
+    res.status(200).json(results.rows);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error fetching experts' });
+  }
+});
+
 module.exports = router;
+

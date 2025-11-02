@@ -1,16 +1,20 @@
 // src/pages/PatientDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import api from '../api'; // Import our new api helper
+import ContactModal from '../components/ContactModal'; // <-- IMPORT THE NEW MODAL
 
 function PatientDashboard() {
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
 
   // Search State
-  const [searchTerm, setSearchTerm] = useState('');
+  const [pubSearchTerm, setPubSearchTerm] = useState(''); // Renamed
+  const [trialSearchTerm, setTrialSearchTerm] = useState(''); // Renamed
   const [publications, setPublications] = useState([]);
   const [trials, setTrials] = useState([]);
+  const [trialStatusFilter, setTrialStatusFilter] = useState('ALL'); // <-- NEW
 
+  // Expert State
   const [expertSearchTerm, setExpertSearchTerm] = useState('');
   const [experts, setExperts] = useState([]);
 
@@ -25,12 +29,12 @@ function PatientDashboard() {
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostBody, setNewPostBody] = useState('');
 
-  // --- NEW: Popup Toast State ---
+  // Popup/Modal State
   const [toastMessage, setToastMessage] = useState('');
+  const [meetingRequest, setMeetingRequest] = useState(null); // <-- NEW MODAL STATE
 
   // --- 1. Fetch Profile & Categories on Page Load ---
   useEffect(() => {
-    // ... (Your existing useEffect code is perfect, no changes needed) ...
     const fetchProfile = async () => {
       try {
         const response = await api.get('/profile/patient');
@@ -52,14 +56,14 @@ function PatientDashboard() {
 
     fetchProfile();
     fetchCategories();
-  }, []);
+  }, []); // Runs once on page load
 
   // --- 2. Search Handlers ---
-  // ... (Your search handlers are perfect, no changes needed) ...
   const handleSearchPublications = async (e) => {
     e.preventDefault();
+    setError('');
     try {
-      const response = await api.post('/search/publications', { searchTerm });
+      const response = await api.post('/search/publications', { searchTerm: pubSearchTerm });
       setPublications(response.data);
     } catch (err) {
       console.error('Search failed', err);
@@ -67,10 +71,15 @@ function PatientDashboard() {
     }
   };
 
+  // --- UPDATED: Search Trials with Filter ---
   const handleSearchTrials = async (e) => {
     e.preventDefault();
+    setError('');
     try {
-      const response = await api.post('/search/trials', { searchTerm });
+      const response = await api.post('/search/trials', { 
+        searchTerm: trialSearchTerm,
+        statusFilter: trialStatusFilter // <-- Pass the filter
+      });
       setTrials(response.data);
     } catch (err) {
       console.error('Search failed', err);
@@ -78,20 +87,7 @@ function PatientDashboard() {
     }
   };
 
-  const handleSearchExperts = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      const response = await api.post('/search/experts', { searchTerm: expertSearchTerm });
-      setExperts(response.data);
-    } catch (err) {
-      console.error('Expert search failed', err);
-      setError('Search for experts failed.');
-    }
-  };
-
   // --- 3. Forum Handlers ---
-  // ... (Your forum handlers are perfect, no changes needed) ...
   const handleCategoryClick = async (categoryId) => {
     setSelectedCategory(categoryId);
     setSelectedPost(null);
@@ -131,7 +127,7 @@ function PatientDashboard() {
         body: newPostBody,
         communityId: selectedCategory,
       });
-      setPosts([response.data, ...posts]);
+      setPosts([response.data, ...posts]); // Add new post to the top
       setNewPostTitle('');
       setNewPostBody('');
     } catch (err) {
@@ -139,37 +135,58 @@ function PatientDashboard() {
       setError('Could not submit your question.');
     }
   };
+  
+  // --- 4. Helper function to show toast ---
+  const showToast = (message) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(''), 1500); // Show for 1.5 seconds
+  };
 
-
-  // --- 4. UPDATED: Handle Add to Favorites ---
+  // --- 5. Handle Add to Favorites ---
   const handleFavorite = async (itemId, itemType) => {
     try {
       await api.post('/favorites', { itemId, itemType });
-      
-      // --- This replaces alert() ---
-      setToastMessage('Added to favorites!');
-      setTimeout(() => setToastMessage(''), 2000); // Hide after 1 second
-      
+      showToast('Added to favorites!');
     } catch (err) {
       console.error('Failed to add favorite', err);
-      
-      // --- This also replaces alert() ---
       if (err.response && err.response.status === 409) {
-        setToastMessage('Item is already in your favorites.');
+        showToast('Item is already in your favorites.');
       } else {
-        setToastMessage('Could not add to favorites.');
+        showToast('Could not add to favorites.');
       }
-      setTimeout(() => setToastMessage(''), 2000); // Hide after 1 second
     }
   };
-
+  
+  // --- 6. Handle Expert Search & Meeting Request ---
+  const handleSearchExperts = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const response = await api.post('/search/experts', { searchTerm: expertSearchTerm });
+      setExperts(response.data);
+    } catch (err) {
+      console.error('Expert search failed', err);
+      setError('Search for experts failed.');
+    }
+  };
+  
+  // --- NEW: Handle Meeting Request ---
+  const handleMeetingRequest = (expertName) => {
+    setMeetingRequest({ name: expertName }); // Open the modal
+  };
+  
+  const confirmMeetingRequest = () => {
+    // In a real app, this would send an email or backend request
+    // For the MVP, we just show a confirmation toast
+    showToast(`Meeting request sent to ${meetingRequest.name}!`);
+    setMeetingRequest(null); // Close the modal
+  };
 
   if (!profile) return <div>Loading your profile...</div>;
 
   return (
-    // We add a React.Fragment (empty <>) to allow the popup to be a sibling
     <> 
-      {/* --- NEW: This is the Popup --- */}
+      {/* --- Popups & Modals --- */}
       {toastMessage && (
         <div className="toast-backdrop">
           <div className="toast-box">
@@ -177,8 +194,18 @@ function PatientDashboard() {
           </div>
         </div>
       )}
+      
+      {/* --- NEW: Meeting Request Modal --- */}
+      {meetingRequest && (
+        <ContactModal 
+          title="Request Meeting"
+          message={`Are you sure you want to request a meeting with ${meetingRequest.name}? They will be sent your contact details.`}
+          onConfirm={confirmMeetingRequest}
+          onCancel={() => setMeetingRequest(null)}
+        />
+      )}
 
-      {/* This is your existing dashboard content */}
+      {/* Your existing dashboard page */}
       <div className="dashboard">
         {/* --- COLUMN 1: SEARCH & PROFILE --- */}
         <div className="search-column">
@@ -192,26 +219,38 @@ function PatientDashboard() {
               <input
                 type="text"
                 placeholder="e.g., Glioma treatment"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={pubSearchTerm}
+                onChange={(e) => setPubSearchTerm(e.target.value)}
               />
               <button type="submit">Search</button>
             </form>
           </div>
 
-          {/* Trial Search */}
+          {/* --- UPDATED: Trial Search with Filter --- */}
           <div className="search-box">
             <h3>Search Clinical Trials</h3>
             <form onSubmit={handleSearchTrials}>
               <input
                 type="text"
                 placeholder="e.g., Glioblastoma"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={trialSearchTerm}
+                onChange={(e) => setTrialSearchTerm(e.target.value)}
               />
+              <select 
+                value={trialStatusFilter} 
+                onChange={(e) => setTrialStatusFilter(e.target.value)}
+                style={{ marginLeft: '0.5rem' }}
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="RECRUITING">RECRUITING</option>
+                <option value="COMPLETED">COMPLETED</option>
+                <option value="NOT_YET_RECRUITING">NOT_YET_RECRUITING</option>
+              </select>
               <button type="submit">Search</button>
             </form>
           </div>
+          
+          {/* Expert Search */}
           <div className="search-box">
             <h3>Search Health Experts</h3>
             <form onSubmit={handleSearchExperts}>
@@ -230,9 +269,9 @@ function PatientDashboard() {
 
         {/* --- COLUMN 2: FORUMS & RESULTS --- */}
         <div className="results-column">
+
           {/* --- FORUM SECTION --- */}
           <h3>Community Forums</h3>
-          {/* ... (Your forum JSX is perfect, no changes needed) ... */}
           <div className="forum-container">
             <h4>Categories</h4>
             {categories.map((cat) => (
@@ -246,6 +285,8 @@ function PatientDashboard() {
             ))}
             
             <hr />
+
+            {/* Ask a Question Form */}
             <form onSubmit={handlePostSubmit}>
               <h4>Ask a Question</h4>
               <input 
@@ -269,7 +310,10 @@ function PatientDashboard() {
               </button>
               {!selectedCategory && <small style={{ display: 'block', color: 'red', marginTop: '0.5rem' }}>Please select a category first.</small>}
             </form>
+
             <hr />
+
+            {/* Posts & Replies */}
             {posts.map((post) => (
               <div key={post.id} className="result-item" style={{ background: '#f9f9f9' }}>
                 <h4>{post.title}</h4>
@@ -280,6 +324,7 @@ function PatientDashboard() {
                   {selectedPost === post.id ? 'Hide Replies' : 'Show Replies'}
                 </button>
                 
+                {/* Show Replies if this post is selected */}
                 {selectedPost === post.id && (
                   <div style={{ marginTop: '1rem', borderTop: '1px solid #ddd', paddingTop: '1rem' }}>
                     {replies.length > 0 ? (
@@ -314,13 +359,23 @@ function PatientDashboard() {
             </div>
           ))}
 
+          {/* --- UPDATED: Trial Results with Email --- */}
           <h3 style={{ marginTop: '2rem' }}>Clinical Trial Results</h3>
           {trials.map((trial) => (
             <div key={trial.id} className="result-item">
               <h4>{trial.title}</h4>
               <p><strong>Status:</strong> {trial.status}</p>
               <p><strong>AI Summary:</strong> {trial.ai_summary}</p>
-              <a href={trial.trial_url} target="_blank" rel="noopener noreferrer" style={{ marginRight: '1Frem' }}>View Trial</a>
+              {/* --- NEW: Clickable Email --- */}
+              {trial.contact_email && trial.contact_email !== 'N/A' && (
+                <a 
+                  href={`mailto:${trial.contact_email}?subject=Question about trial ${trial.id}`} 
+                  style={{ marginRight: '1rem', fontSize: '0.9rem' }}
+                >
+                  Contact Trial
+                </a>
+              )}
+              <a href={trial.trial_url} target="_blank" rel="noopener noreferrer" style={{ marginRight: '1rem' }}>View Trial</a>
               <button 
                 onClick={() => handleFavorite(trial.id, 'TRIAL')}
                 style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', background: '#6c757d' }}
@@ -329,27 +384,40 @@ function PatientDashboard() {
               </button>
             </div>
           ))}
-            {/* --- NEW: Expert Results --- */}
+          
+          {/* --- UPDATED: Expert Results --- */}
           <h3 style={{ marginTop: '2rem' }}>Health Expert Results</h3>
           {experts.map((expert) => (
             <div key={expert.user_id} className="result-item">
               <h4>{expert.full_name}</h4>
-              <p><strong>Specialties:</strong> {expert.specialties?.join(', ')}</p>
-              <p><strong>Interests:</strong> {expert.research_interests?.join(', ')}</p>
-
-              {/* We use 'expert.user_id' for favoriting */}
+              {/* --- THIS IS THE FIX --- */}
+              <p>
+                <strong>Specialties:</strong> {expert.specialties?.join(', ')} <br/>
+                <strong>Interests:</strong> {expert.research_interests?.join(', ')}
+              </p>
+              {/* --- END OF FIX --- */}
+              
               <button 
                 onClick={() => handleFavorite(expert.user_id, 'EXPERT')}
                 style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', background: '#6c757d' }}
               >
                 + Favorite
               </button>
+              
+              {/* --- NEW: Request Meeting Button --- */}
+              <button 
+                onClick={() => handleMeetingRequest(expert.full_name)}
+                style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', background: '#007bff', marginLeft: '0.5rem' }}
+              >
+                Request Meeting
+              </button>
             </div>
           ))}
         </div>
       </div>
-    </> // End of the React.Fragment
+    </>
   );
 }
 
 export default PatientDashboard;
+

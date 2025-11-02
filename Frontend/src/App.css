@@ -149,3 +149,164 @@ button {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* --- Add this for the Confirmation Modal --- */
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-box {
+  background-color: #fff;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  max-width: 400px;
+  text-align: center;
+}
+
+.modal-box h3 {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.modal-buttons button {
+  padding: 0.5rem 1.5rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.modal-buttons .btn-yes {
+  background-color: #dc3545; /* Red for delete */
+  color: white;
+  border: 1px solid #dc3545;
+}
+
+.modal-buttons .btn-no {
+  background-color: #f8f9fa;
+  color: #333;
+  border: 1px solid #ccc;
+}
+
+/* --- Add this for the Chat Page --- */
+
+.chat-messages-area {
+  height: 60vh;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  background-color: #f9f9f9;
+}
+
+.chat-message-container {
+  display: flex;
+  margin-bottom: 0.5rem;
+}
+
+.chat-message {
+  padding: 0.75rem 1rem;
+  border-radius: 18px;
+  max-width: 70%;
+  word-wrap: break-word;
+}
+
+.chat-message p {
+  margin: 0 0 0.25rem 0;
+}
+.chat-message small {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+/* --- This is the logic --- */
+.chat-message-container.sent {
+  justify-content: flex-end; /* Aligns to the right */
+}
+
+.chat-message-container.received {
+  justify-content: flex-start; /* Aligns to the left */
+}
+
+.chat-message.sent {
+  background-color: #007bff; /* Blue */
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-message.received {
+  background-color: #e9ecef; /* Gray */
+  color: #333;
+  border-bottom-left-radius: 4px;
+}
+
+.chat-message-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  /* Hide by default, show on hover */
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.chat-message:hover .chat-message-actions {
+  visibility: visible;
+  opacity: 1;
+}
+
+.chat-btn-edit, .chat-btn-delete, .chat-btn-save, .chat-btn-cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0;
+}
+
+.chat-btn-edit { color: #007bff; }
+.chat-btn-delete { color: #dc3545; }
+.chat-btn-save { color: #28a745; }
+.chat-btn-cancel { color: #6c757d; }
+
+.chat-edit-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chat-edit-mode textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.chat-edit-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
