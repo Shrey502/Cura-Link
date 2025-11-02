@@ -90,119 +90,120 @@ router.post('/publications', authenticateToken, async (req, res) => {
   }
 });
 
-// routes/search.js
-
-// ... (keep all your existing code for '/publications' at the top) ...
-
-// --- Search Clinical Trials ---
-// routes/search.js
-
-// ... (keep your existing '/publications' route) ...
-
 // --- Search Clinical Trials (FIXED v2 API) ---
 router.post('/trials', authenticateToken, async (req, res) => {
+  const { searchTerm } = req.body;
+  if (!searchTerm) {
+    return res.status(400).json({ error: 'searchTerm is required' });
+  }
+  const trialsUrl = 'https://clinicaltrials.gov/api/v2/studies';
+  try {
+    console.log(`Searching ClinicalTrials.gov for: ${searchTerm}`);
+    const searchResponse = await axios.get(trialsUrl, {
+      params: {
+        'query.term': searchTerm,
+        'fields': 'NCTId,BriefTitle,BriefSummary,OverallStatus,LocationCity,LocationCountry',
+        'format': 'json',
+        'pageSize': 5
+      }
+    });
+    const studies = searchResponse.data.studies;
+    if (!studies || studies.length === 0) {
+      return res.status(404).json({ message: 'No clinical trials found.' });
+    }
+    let trials = [];
+    for (const study of studies) {
+      const trialId = study.protocolSection.identificationModule.nctId;
+      const title = study.protocolSection.identificationModule.briefTitle;
+      const summary = study.protocolSection.descriptionModule.briefSummary;
+      const status = study.protocolSection.statusModule.overallStatus;
+      const locations = study.protocolSection.contactsLocationsModule.locations;
+      let locationString = 'N/A';
+      if (locations && locations.length > 0) {
+          locationString = `${locations[0].city}, ${locations[0].country}`;
+      }
+      if (!summary) continue;
+      console.log(`Summarizing trial: ${trialId}`);
+      const hfUrl = 'https://api-inference.huggingface.co/models/facebook/bart-large-cnn';
+      let aiSummary = "Summary not available.";
+      try {
+        const aiResponse = await axios.post(
+          hfUrl,
+          { "inputs": summary },
+          { headers: { 'Authorization': `Bearer ${process.env.HF_API_KEY}` } }
+        );
+        aiSummary = aiResponse.data[0].summary_text;
+      } catch (aiError) {
+        console.error(`AI summarization failed for ${trialId}:`, aiError.message);
+      }
+      const trial = {
+        id: trialId,
+        title: title,
+        description: summary,
+        ai_summary: aiSummary,
+        status: status,
+        location: locationString,
+        contact_email: 'N/A',
+        trial_url: `https://clinicaltrials.gov/study/${trialId}`
+      };
+      trials.push(trial);
+      try {
+        const saveQuery = `
+          INSERT INTO clinical_trials (id, title, description, ai_summary, status, location, contact_email, trial_url)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          ON CONFLICT (id) DO NOTHING;
+        `;
+        await db.query(saveQuery, [
+          trial.id, trial.title, trial.description, trial.ai_summary, 
+          trial.status, trial.location, trial.contact_email, trial.trial_url
+        ]);
+      } catch (dbError) {
+        console.error(`Database save failed for ${trial.id}:`, dbError.message);
+      }
+    }
+    res.status(200).json(trials);
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      console.error("API endpoint returned 404. Check URL.", err.config.url);
+      return res.status(500).json({ error: "Trial search service is configured incorrectly." });
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Server error fetching trials' });
+  }
+});
+
+// routes/search.js
+
+// ... (keep your existing '/publications' and '/trials' routes) ...
+
+// --- Search Health Experts (Researchers) ---
+router.post('/experts', authenticateToken, async (req, res) => {
     const { searchTerm } = req.body;
     if (!searchTerm) {
       return res.status(400).json({ error: 'searchTerm is required' });
     }
   
-    // THIS IS THE CORRECT API URL
-    const trialsUrl = 'https://clinicaltrials.gov/api/v2/studies';
-  
     try {
-      // --- 1. Search ClinicalTrials.gov v2 API ---
-      console.log(`Searching ClinicalTrials.gov for: ${searchTerm}`);
-      const searchResponse = await axios.get(trialsUrl, {
-        params: {
-          'query.term': searchTerm, // Use 'query.term' instead of 'expr'
-          'fields': 'NCTId,BriefTitle,BriefSummary,OverallStatus,LocationCity,LocationCountry',
-          'format': 'json',
-          'pageSize': 5 // Use 'pageSize' instead of 'max_rnk'
-        }
-      });
-  
-      // The new API response structure is simpler
-      const studies = searchResponse.data.studies;
-      if (!studies || studies.length === 0) {
-        return res.status(404).json({ message: 'No clinical trials found.' });
-      }
-  
-      let trials = [];
-  
-      for (const study of studies) {
-        // --- 2. Get the data (note the camelCase) ---
-        const trialId = study.protocolSection.identificationModule.nctId;
-        const title = study.protocolSection.identificationModule.briefTitle;
-        const summary = study.protocolSection.descriptionModule.briefSummary;
-        const status = study.protocolSection.statusModule.overallStatus;
-        
-        const locations = study.protocolSection.contactsLocationsModule.locations;
-        let locationString = 'N/A';
-        if (locations && locations.length > 0) {
-            // Just grab the first location for simplicity
-            locationString = `${locations[0].city}, ${locations[0].country}`;
-        }
-  
-        // Skip if there's no summary to analyze
-        if (!summary) continue;
-  
-        // --- 3. AI Summarization (with Hugging Face) ---
-        console.log(`Summarizing trial: ${trialId}`);
-        const hfUrl = 'https://api-inference.huggingface.co/models/facebook/bart-large-cnn';
-        let aiSummary = "Summary not available.";
-  
-        try {
-          const aiResponse = await axios.post(
-            hfUrl,
-            { "inputs": summary },
-            { headers: { 'Authorization': `Bearer ${process.env.HF_API_KEY}` } }
-          );
-          aiSummary = aiResponse.data[0].summary_text;
-        } catch (aiError) {
-          console.error(`AI summarization failed for ${trialId}:`, aiError.message);
-        }
-  
-        const trial = {
-          id: trialId,
-          title: title,
-          description: summary,
-          ai_summary: aiSummary,
-          status: status,
-          location: locationString,
-          contact_email: 'N/A', // This field is harder to get, mock for now
-          trial_url: `https://clinicaltrials.gov/study/${trialId}`
-        };
-        
-        trials.push(trial);
-  
-        // --- 4. Save to our Database ---
-        try {
-          const saveQuery = `
-            INSERT INTO clinical_trials (id, title, description, ai_summary, status, location, contact_email, trial_url)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT (id) DO NOTHING;
-          `;
-          await db.query(saveQuery, [
-            trial.id, trial.title, trial.description, trial.ai_summary, 
-            trial.status, trial.location, trial.contact_email, trial.trial_url
-          ]);
-        } catch (dbError) {
-          console.error(`Database save failed for ${trial.id}:`, dbError.message);
-        }
-      }
-  
-      res.status(200).json(trials);
+      // We'll search for the term in the full_name, specialties, or research_interests
+      // The 'ilike' command is case-insensitive
+      // The '->>' operator is for searching inside JSONB text
+      const query = `
+        SELECT user_id, full_name, specialties, research_interests
+        FROM researcher_profiles
+        WHERE 
+          full_name ILIKE $1 OR
+          specialties::text ILIKE $1 OR
+          research_interests::text ILIKE $1;
+      `;
+      
+      // Add '%' wildcards for a "contains" search
+      const results = await db.query(query, [`%${searchTerm}%`]);
+      
+      res.status(200).json(results.rows);
   
     } catch (err) {
-      // This will catch the 404 if it happens again
-      if (err.response && err.response.status === 404) {
-        console.error("API endpoint returned 404. Check URL.", err.config.url);
-        return res.status(500).json({ error: "Trial search service is configured incorrectly." });
-      }
       console.error(err);
-      res.status(500).json({ error: 'Server error fetching trials' });
+      res.status(500).json({ error: 'Server error fetching experts' });
     }
   });
-  
-  // This line must be at the very bottom
 module.exports = router;

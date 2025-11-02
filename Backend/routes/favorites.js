@@ -36,13 +36,13 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // --- 2. Get all of a user's Favorites ---
+// routes/favorites.js
+
+// --- 2. Get all of a user's Favorites (FIXED) ---
 router.get('/', authenticateToken, async (req, res) => {
   const { userId } = req.user;
 
   try {
-    // This query joins the favorites table with the other tables
-    // to get the actual details of the favorited items.
-    // It's a bit complex, but very powerful.
     const query = `
       SELECT 
         f.item_type,
@@ -56,18 +56,20 @@ router.get('/', authenticateToken, async (req, res) => {
       LEFT JOIN 
         clinical_trials t ON f.item_type = 'TRIAL' AND f.favorited_item_id = t.id
       LEFT JOIN 
-        researcher_profiles rp ON f.item_type = 'EXPERT' AND f.favorited_item_id::UUID = rp.user_id
+        researcher_profiles rp ON f.item_type = 'EXPERT' AND f.favorited_item_id = rp.user_id::text
       WHERE 
         f.user_id = $1;
     `;
     const favorites = await db.query(query, [userId]);
     res.status(200).json(favorites.rows);
-
+  
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error fetching favorites' });
   }
 });
+
+// ... (keep your POST and DELETE routes) ...
 
 // --- 3. Remove a Favorite ---
 router.delete('/', authenticateToken, async (req, res) => {

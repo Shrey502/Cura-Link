@@ -1,42 +1,151 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
+/* src/App.css */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  background-color: #f4f7f6;
+}
+
+.dashboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
   padding: 2rem;
+  max-width: 1200px;
+  margin: auto;
+}
+
+.search-column, .results-column {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.search-box {
+  margin-bottom: 2rem;
+}
+
+input, button {
+  font-size: 1rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+button {
+  cursor: pointer;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  margin-left: 0.5rem;
+}
+
+.result-item {
+  border: 1px solid #eee;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+}
+.result-item h4 {
+  margin-top: 0;
+}
+.result-item p {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* src/App.css */
+
+/* --- Add these styles for the Landing Page --- */
+.landing-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.landing-box {
+  max-width: 600px;
+  padding: 2rem;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.landing-box h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.landing-box p {
+  font-size: 1.2rem;
+  color: #555;
+  margin-bottom: 3rem;
 }
 
-.card {
-  padding: 2em;
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.read-the-docs {
-  color: #888;
+.cta-button {
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 1rem 2rem;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.cta-button.patient {
+  background-color: #007bff;
+  color: white;
+}
+
+.cta-button.patient:hover {
+  background-color: #0056b3;
+}
+
+.cta-button.researcher {
+  background-color: #f4f7f6;
+  color: #333;
+  border-color: #ccc;
+}
+
+.cta-button.researcher:hover {
+  background-color: #e9ecef;
+}
+
+/* --- Add this for the Popup Toast --- */
+
+.toast-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  /* Simple fade-in animation */
+  animation: fadeIn 0.2s ease-out;
+}
+
+.toast-box {
+  background-color: #333; /* The "black box" */
+  color: white;
+  padding: 1.5rem 2.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

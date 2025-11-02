@@ -4,6 +4,42 @@ const db = require('../db/db');
 const authenticateToken = require('../middleware/authenticateToken');
 const router = express.Router();
 
+// --- Get Patient Profile ---
+router.get('/patient', authenticateToken, async (req, res) => {
+  const { userId } = req.user;
+  try {
+    const profile = await db.query(
+      'SELECT * FROM patient_profiles WHERE user_id = $1',
+      [userId]
+    );
+    if (profile.rows.length === 0) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    res.status(200).json({ profile: profile.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// --- Get Researcher Profile ---
+router.get('/researcher', authenticateToken, async (req, res) => {
+  const { userId } = req.user;
+  try {
+    const profile = await db.query(
+      'SELECT * FROM researcher_profiles WHERE user_id = $1',
+      [userId]
+    );
+    if (profile.rows.length === 0) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    res.status(200).json({ profile: profile.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // --- Update Patient Profile ---
 router.put('/patient', authenticateToken, async (req, res) => {
   const { userId, role } = req.user;

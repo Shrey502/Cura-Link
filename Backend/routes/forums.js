@@ -46,7 +46,14 @@ router.post('/categories', authenticateToken, async (req, res) => {
 router.get('/posts/:categoryId', authenticateToken, async (req, res) => {
   const { categoryId } = req.params;
   try {
-    const query = 'SELECT * FROM forum_posts WHERE community_id = $1 ORDER BY created_at DESC';
+    // UPDATED QUERY: Join patient_profiles to get the full_name
+    const query = `
+      SELECT p.*, pp.full_name 
+      FROM forum_posts p
+      JOIN patient_profiles pp ON p.author_id = pp.user_id
+      WHERE p.community_id = $1 
+      ORDER BY p.created_at DESC;
+    `;
     const posts = await db.query(query, [categoryId]);
     res.status(200).json(posts.rows);
   } catch (err) {
@@ -85,7 +92,14 @@ router.post('/posts', authenticateToken, async (req, res) => {
 router.get('/replies/:postId', authenticateToken, async (req, res) => {
   const { postId } = req.params;
   try {
-    const query = 'SELECT * FROM forum_replies WHERE post_id = $1 ORDER BY created_at ASC';
+    // UPDATED QUERY: Join researcher_profiles to get the full_name
+    const query = `
+      SELECT r.*, rp.full_name
+      FROM forum_replies r
+      JOIN researcher_profiles rp ON r.author_id = rp.user_id
+      WHERE r.post_id = $1 
+      ORDER BY r.created_at ASC;
+    `;
     const replies = await db.query(query, [postId]);
     res.status(200).json(replies.rows);
   } catch (err) {
@@ -100,7 +114,7 @@ router.post('/replies', authenticateToken, async (req, res) => {
   const { body, postId } = req.body;
 
   if (role !== 'RESEARCHER') {
-    return res.status(403).json({ error: 'Forbidden: Only researchers can reply' });
+    return res.status(403).json({ error: 'Forbidden: Only researchers can reply' }); // Typo was here
   }
   if (!body || !postId) {
     return res.status(400).json({ error: 'Body and postId are required' });
