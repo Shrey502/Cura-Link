@@ -48,7 +48,7 @@ router.post('/publications', authenticateToken, async (req, res) => {
       }
       if (!abstractText) continue;
       console.log(`Summarizing abstract for PMID: ${pubmedData.PMID}`);
-      const hfUrl = 'https://api-inference.huggingface.co/models/facebook/bart-large-cnn';
+      const hfUrl = 'https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn';
       let aiSummary = "Summary not available.";
       try {
         const aiResponse = await axios.post(
@@ -143,7 +143,7 @@ router.post('/trials', authenticateToken, async (req, res) => {
       if (!summary) continue;
 
       console.log(`Summarizing trial: ${trialId}`);
-      const hfUrl = 'https://api-inference.huggingface.co/models/facebook/bart-large-cnn';
+      const hfUrl = 'https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn';
       let aiSummary = "Summary not available.";
 
       try {

@@ -31,6 +31,8 @@
 
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+
+  --bg-primary-rgb: 248, 249, 250;
 }
 
 /* 3. Define the Dark Theme */
@@ -55,6 +57,8 @@
   
   --danger-bg: #ef4444;
   --danger-hover: #f87171;
+
+  --bg-primary-rgb: 17, 24, 39;
 }
 
 /* 4. Apply global styles */
@@ -282,6 +286,25 @@ label {
 .result-item button:hover {
   background-color: var(--btn-secondary-hover);
 }
+
+.results-column{
+  height: 80vh;
+  overflow-y: auto;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.results-column::-webkit-scrollbar {
+  width: 6px;
+}
+.results-column::-webkit-scrollbar-thumb {
+  background: #3b82f6; /* Blue scrollbar */
+  border-radius: 10px;
+}
+.results-column::-webkit-scrollbar-thumb:hover {
+  background: #2563eb;
+}
+
 
 /* --- Landing Page --- */
 .landing-container {
@@ -756,7 +779,7 @@ label {
 }
 
 .status-select {
-  flex: 5; /* smaller than input box */
+  flex: 1; /* smaller than input box */
   padding: 8px;
   border-radius: 6px;
   background-color: #1e293b;
@@ -772,3 +795,63 @@ label {
   color: black;
   cursor: pointer;
 }
+
+.please {
+  color: #119cff;
+}
+
+#landing-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1; /* Behind the content */
+  opacity: 0.2; /* Soft and subtle */
+}
+
+/* Make landing page container relative */
+.landing-container {
+  position: relative;
+  overflow: hidden; /* Hide canvas overflow */
+  min-height: 90vh; /* Adjust height */
+}
+
+/* Make landing box sit on top */
+.landing-box {
+  position: relative;
+  z-index: 2;
+  /* Add a subtle backdrop to make text readable */
+  background: radial-gradient(ellipse at center, 
+    rgba(var(--bg-primary-rgb), 0.8) 0%, 
+    rgba(var(--bg-primary-rgb), 0.5) 50%, 
+    rgba(var(--bg-primary-rgb), 0.0) 100%);
+  padding: 3rem;
+  border-radius: 50%;
+}
+
+/* --- 11. NEW: Spinner --- */
+.spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4rem;
+  min-height: 200px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 5px solid var(--border-color);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+

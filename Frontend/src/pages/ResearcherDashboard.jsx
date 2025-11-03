@@ -36,25 +36,27 @@ const getInitialState = (key, defaultValue) => {
 function ResearcherDashboard() {
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
-  
-  // --- THIS LINE WAS MISSING ---
-  const [loading, setLoading] = useState(true); 
-  // -----------------------------
-
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   
-  // --- UPDATED: State now loads from sessionStorage ---
+  // Forum State
   const [categories, setCategories] = useState(() => getInitialState(SESSION_KEYS.CATEGORIES, []));
   const [selectedCategory, setSelectedCategory] = useState(() => getInitialState(SESSION_KEYS.SELECTED_CATEGORY, null));
   const [posts, setPosts] = useState(() => getInitialState(SESSION_KEYS.POSTS, []));
   const [selectedPost, setSelectedPost] = useState(() => getInitialState(SESSION_KEYS.SELECTED_POST, null));
   const [replies, setReplies] = useState(() => getInitialState(SESSION_KEYS.REPLIES, []));
   const [replyBody, setReplyBody] = useState('');
+  
+  // --- NEW: Create Category State ---
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryDesc, setNewCategoryDesc] = useState('');
 
+
+  // Collaborator State
   const [collabSearchTerm, setCollabSearchTerm] = useState(() => getInitialState(SESSION_KEYS.COLLAB_SEARCH_TERM, ''));
   const [collaborators, setCollaborators] = useState(() => getInitialState(SESSION_KEYS.COLLABORATORS, []));
   
-  // --- NEW: Connection & Chat State ---
+  // Connection & Chat State
   const [pendingRequests, setPendingRequests] = useState(() => getInitialState(SESSION_KEYS.PENDING_REQUESTS, []));
   const [acceptedCollabs, setAcceptedCollabs] = useState(() => getInitialState(SESSION_KEYS.ACCEPTED_COLLABS, []));
   const [sentRequests, setSentRequests] = useState(() => getInitialState(SESSION_KEYS.SENT_REQUESTS, []));
@@ -75,7 +77,7 @@ function ResearcherDashboard() {
     };
     
     const fetchCategories = async () => {
-      if (categories.length > 0) return; // Don't refetch if we have it
+      if (categories.length > 0 && sessionStorage.getItem(SESSION_KEYS.CATEGORIES)) return; // Don't refetch if we have it
       try {
         const response = await api.get('/forums');
         setCategories(response.data);
@@ -85,7 +87,6 @@ function ResearcherDashboard() {
       }
     };
 
-    // --- NEW: Fetch Pending and Accepted Connections ---
     const fetchConnections = async () => {
       try {
         const [pendingRes, acceptedRes] = await Promise.all([
@@ -171,6 +172,32 @@ function ResearcherDashboard() {
       console.error('Failed to post reply', err);
     }
   };
+
+  // --- NEW: Create Category Handler ---
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName || !newCategoryDesc) {
+      setError('Please fill out both name and description.');
+      return;
+    }
+    try {
+      const response = await api.post('/forums/categories', {
+        name: newCategoryName,
+        description: newCategoryDesc
+      });
+      // Add new category to the list and save to session
+      const newCategories = [...categories, response.data];
+      setCategories(newCategories);
+      sessionStorage.setItem(SESSION_KEYS.CATEGORIES, JSON.stringify(newCategories));
+      // Clear the form
+      setNewCategoryName('');
+      setNewCategoryDesc('');
+      setError('');
+    } catch (err) {
+      console.error('Failed to create category', err);
+      setError('Failed to create category. Please try again.');
+    }
+  };
   
   // --- 3. Collaborator & Connection Handlers (UPDATED) ---
   const showToast = (message) => {
@@ -191,7 +218,7 @@ function ResearcherDashboard() {
       // Filter out ourself, and anyone we're already connected to
       const myCollabIds = acceptedCollabs.map(c => c.collaborator_id);
       const otherResearchers = response.data.filter(
-        r => r.user_id !== profile.user_id && !myCollabIds.includes(r.user_id)
+        r => r.user_id !== profile?.user_id && !myCollabIds.includes(r.user_id)
       );
       setCollaborators(otherResearchers);
       sessionStorage.setItem(SESSION_KEYS.COLLABORATORS, JSON.stringify(otherResearchers));
@@ -215,7 +242,6 @@ function ResearcherDashboard() {
     }
   };
   
-  // --- UPDATED: Connect Request (now calls API) ---
   const handleConnectRequest = (researcherName, researcherId) => {
     setConnectRequest({ name: researcherName, id: researcherId }); 
   };
@@ -244,17 +270,14 @@ function ResearcherDashboard() {
     }
   };
 
-  // --- NEW: Respond to a connection request ---
   const handleRequestResponse = async (requestId, response) => {
     try {
       await api.put('/connections/respond', { requestId, response });
       
-      // Remove from pending list
       const newPending = pendingRequests.filter(req => req.id !== requestId);
       setPendingRequests(newPending);
       sessionStorage.setItem(SESSION_KEYS.PENDING_REQUESTS, JSON.stringify(newPending));
 
-      // If accepted, fetch accepted collabs again to update the list
       if (response === 'ACCEPTED') {
         const acceptedRes = await api.get('/connections/accepted');
         setAcceptedCollabs(acceptedRes.data);
@@ -268,14 +291,10 @@ function ResearcherDashboard() {
     }
   };
 
-  // --- NEW: Start a chat ---
   const handleStartChat = async (collaboratorId, collaboratorName) => {
     try {
-      // Create or get the chat room
       const response = await api.post('/chat/rooms', { otherUserId: collaboratorId });
       const room = response.data;
-      
-      // Navigate to the chat page, passing room info
       navigate('/chat', { state: { roomId: room.id, roomName: collaboratorName } });
     } catch (err) {
       console.error('Failed to start chat', err);
@@ -283,7 +302,6 @@ function ResearcherDashboard() {
     }
   };
 
-  // --- UPDATED: Use the loading state ---
   if (loading || !profile) { 
     return (
       <div className="spinner-container">
@@ -317,7 +335,6 @@ function ResearcherDashboard() {
           <h2>Welcome, {profile.full_name}</h2>
           <p>Your specialties: <strong>{profile.specialties?.join(', ')}</strong></p>
           
-          {/* --- NEW: Pending Requests Section --- */}
           <div className="search-box" style={{ marginTop: '2rem' }}>
             <h3>Pending Connection Requests</h3>
             {pendingRequests.length === 0 ? (
@@ -327,8 +344,8 @@ function ResearcherDashboard() {
                 <div key={req.id} className="result-item" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                   <span><strong>{req.requester_name}</strong> wants to connect.</span>
                   <div>
-                    <button onClick={() => handleRequestResponse(req.id, 'ACCEPTED')} style={{ background: '#28a745', fontSize: '0.8rem', padding: '0.25rem 0.5rem', marginRight: '0.5rem' }}>Accept</button>
-                    <button onClick={() => handleRequestResponse(req.id, 'REJECTED')} style={{ background: '#dc3545', fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}>Reject</button>
+                    <button onClick={() => handleRequestResponse(req.id, 'ACCEPTED')} className="btn btn-success" style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', marginRight: '0.5rem' }}>Accept</button>
+                    <button onClick={() => handleRequestResponse(req.id, 'REJECTED')} className="btn btn-danger" style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}>Reject</button>
                   </div>
                 </div>
               ))
@@ -344,22 +361,55 @@ function ResearcherDashboard() {
                 value={collabSearchTerm}
                 onChange={handleCollabSearchTermChange}
               />
-              <button type="submit">Search</button>
+              <button type="submit" className="btn btn-primary">Search</button>
             </form>
           </div>
           
-          {error && <p style={{ color: 'red' }}>{error}</p>}
+          {error && <p className="error-message">{error}</p>}
 
-          <hr style={{ margin: '2rem 0' }} />
+          <hr style={{ margin: '2rem 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
 
           <h3>Forum Management</h3>
-          <h4>Categories</h4>
+          
+          {/* --- UPDATED: Create Category Form --- */}
+          <form onSubmit={handleCreateCategory} className="form-container-animate" style={{ padding: 0, border: 'none', boxShadow: 'none', background: 'none' }}>
+            <h4 style={{marginTop: 0}}>Create New Category</h4>
+            
+            <div className="form-group" style={{marginBottom: '1rem'}}>
+              <label htmlFor="cat-name">Category Name</label>
+              <input 
+                id="cat-name"
+                type="text"
+                placeholder="e.g., Cardiology Research"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group" style={{marginBottom: '1rem'}}>
+              <label htmlFor="cat-desc">Description</label>
+              <input 
+                id="cat-desc"
+                type="text"
+                placeholder="A short description..."
+                value={newCategoryDesc}
+                onChange={(e) => setNewCategoryDesc(e.target.value)}
+                required
+              />
+            </div>
+            
+            <button type="submit" className="btn btn-primary" style={{width: '100%'}}>Create Category</button>
+          </form>
+          {/* --- End New Form --- */}
+
+          <h4 style={{ marginTop: '1.5rem' }}>Categories</h4>
           <div>
             {categories.map((cat) => (
               <button 
                 key={cat.id} 
                 onClick={() => handleCategoryClick(cat.id)}
-                className={selectedCategory === cat.id ? 'btn btn-primary' : 'btn btn-secondary'}
+                className={`btn ${selectedCategory === cat.id ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ marginRight: '0.5rem', marginBottom: '0.5rem' }}
               >
                 {cat.name}
@@ -390,7 +440,6 @@ function ResearcherDashboard() {
 
         {/* --- COLUMN 2: COLLABORATORS & FORUM REPLIES --- */}
         <div className="results-column">
-          {/* --- NEW: My Collaborators List --- */}
           <h3>My Collaborators</h3>
           {acceptedCollabs.length > 0 ? (
             acceptedCollabs.map((collab) => (
@@ -409,7 +458,7 @@ function ResearcherDashboard() {
             <p>No collaborators yet. Find them in the search below.</p>
           )}
 
-          <hr style={{ margin: '2rem 0' }} />
+          <hr style={{ margin: '2rem 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
           
           <h3>Collaborator Search Results</h3>
           {collaborators.length > 0 ? (
@@ -450,7 +499,7 @@ function ResearcherDashboard() {
             <p>No collaborators found. Try a new search.</p>
           )}
 
-          <hr style={{ margin: '2rem 0' }} />
+          <hr style={{ margin: '2rem 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
           
           <h3>Question & Answers</h3>
           {!selectedPost && <p>Select a question to see the discussion.</p>}
@@ -476,7 +525,7 @@ function ResearcherDashboard() {
                 <h4>Your Answer</h4>
                 <textarea
                   value={replyBody}
-                  onChange={(e) => setReplyBody(e.g.target.value)}
+                  onChange={(e) => setReplyBody(e.target.value)}
                   rows="5"
                   required
                 />
