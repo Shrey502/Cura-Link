@@ -46,7 +46,13 @@ function FavoritesPage() {
     }
   };
 
-  if (loading) return <div>Loading favorites...</div>;
+  if (loading) { // <-- NEW
+    return (
+      <div className="spinner-container">
+        <div className="spinner" />
+      </div>
+    );
+  }
   if (error) return <p style={{ color: 'red' }}>{error}</p>;
 
   return (

@@ -1,7 +1,8 @@
-// src/pages/LandingPage.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import '../App.css'; // We'll create this file
+import '../App.css'; // Use the main App.css file
+// --- NEW: Import professional icons ---
+import { FaStethoscope, FaDna, FaHeartbeat } from 'react-icons/fa';
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -9,6 +10,21 @@ function LandingPage() {
   return (
     <div className="landing-container">
       <div className="landing-box">
+        
+        {/* --- UPDATED: Animation with Icons --- */}
+        <div className="landing-animation">
+          <div className="anim-line"></div>
+          <div className="anim-icon icon-1">
+            <FaStethoscope />
+          </div>
+          <div className="anim-icon icon-2">
+            <FaDna />
+          </div>
+          <div className="anim-icon icon-3">
+            <FaHeartbeat />
+          </div>
+        </div>
+        
         <h1>Welcome to CuraLink.</h1>
         <p>Connecting patients, caregivers, and researchers to the latest in medical science. Effortlessly.</p>
         
@@ -33,3 +49,4 @@ function LandingPage() {
 }
 
 export default LandingPage;
+

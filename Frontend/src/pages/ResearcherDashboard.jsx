@@ -36,6 +36,11 @@ const getInitialState = (key, defaultValue) => {
 function ResearcherDashboard() {
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
+  
+  // --- THIS LINE WAS MISSING ---
+  const [loading, setLoading] = useState(true); 
+  // -----------------------------
+
   const navigate = useNavigate();
   
   // --- UPDATED: State now loads from sessionStorage ---
@@ -99,9 +104,17 @@ function ResearcherDashboard() {
       }
     };
 
-    fetchProfile();
-    fetchCategories();
-    fetchConnections();
+    const loadAllData = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchProfile(),
+        fetchCategories(),
+        fetchConnections()
+      ]);
+      setLoading(false);
+    };
+
+    loadAllData();
   }, []); // Runs once on page load
 
   // --- 2. Forum Handlers (UPDATED to save state) ---
@@ -270,7 +283,14 @@ function ResearcherDashboard() {
     }
   };
 
-  if (!profile) return <div>Loading your profile...</div>;
+  // --- UPDATED: Use the loading state ---
+  if (loading || !profile) { 
+    return (
+      <div className="spinner-container">
+        <div className="spinner" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -339,7 +359,8 @@ function ResearcherDashboard() {
               <button 
                 key={cat.id} 
                 onClick={() => handleCategoryClick(cat.id)}
-                style={{ marginRight: '0.5rem', marginBottom: '0.5rem', background: selectedCategory === cat.id ? '#007bff' : '#eee', color: selectedCategory === cat.id ? '#fff' : '#000' }}
+                className={selectedCategory === cat.id ? 'btn btn-primary' : 'btn btn-secondary'}
+                style={{ marginRight: '0.5rem', marginBottom: '0.5rem' }}
               >
                 {cat.name}
               </button>
@@ -354,7 +375,7 @@ function ResearcherDashboard() {
                   key={post.id} 
                   onClick={() => handlePostClick(post.id)}
                   className="result-item"
-                  style={{ cursor: 'pointer', background: selectedPost === post.id ? '#eef' : '#fff' }}
+                  style={{ cursor: 'pointer', background: selectedPost === post.id ? 'var(--bg-secondary)' : 'var(--bg-card)' }}
                 >
                   <strong>{post.title}</strong>
                   <br />
@@ -377,6 +398,7 @@ function ResearcherDashboard() {
                 <h4>{collab.collaborator_name}</h4>
                 <button 
                   onClick={() => handleStartChat(collab.collaborator_id, collab.collaborator_name)}
+                  className="btn btn-primary"
                   style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
                 >
                   Chat
@@ -399,14 +421,16 @@ function ResearcherDashboard() {
                 
                 <button 
                   onClick={() => handleFavorite(expert.user_id)}
-                  style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', background: '#6c757d' }}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}
                 >
                   + Favorite
                 </button>
 
                 {sentRequests.includes(expert.user_id) ? (
                   <button 
-                    style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', background: '#6c757d', marginLeft: '0.5rem', cursor: 'not-allowed' }}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', marginLeft: '0.5rem', cursor: 'not-allowed' }}
                     disabled
                   >
                     Request Sent
@@ -414,7 +438,8 @@ function ResearcherDashboard() {
                 ) : (
                   <button 
                     onClick={() => handleConnectRequest(expert.full_name, expert.user_id)}
-                    style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', background: '#007bff', marginLeft: '0.5rem' }}
+                    className="btn btn-primary"
+                    style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', marginLeft: '0.5rem' }}
                   >
                     Connect
                   </button>
@@ -436,23 +461,26 @@ function ResearcherDashboard() {
               <h4>{posts.find(p => p.id === selectedPost)?.title}</h4>
               <p style={{ fontStyle: 'italic' }}>{posts.find(p => p.id === selectedPost)?.body}</p>
               <hr />
-              {replies.map((reply) => (
-                <div key={reply.id} className="result-item" style={{ background: '#f9f9f9' }}>
-                  <p>{reply.body}</p>
-                  <small>Answered by: {reply.full_name}</small>
-                </div>
-              ))}
+              {replies.length > 0 ? (
+                replies.map((reply) => (
+                  <div key={reply.id} className="result-item" style={{ background: 'var(--bg-secondary)' }}>
+                    <p>{reply.body}</p>
+                    <small>Answered by: {reply.full_name}</small>
+                  </div>
+                ))
+              ) : (
+                <p>No answers yet. Be the first to reply!</p>
+              )}
               
               <form onSubmit={handleReplySubmit} style={{ marginTop: '1.5rem' }}>
                 <h4>Your Answer</h4>
                 <textarea
                   value={replyBody}
-                  onChange={(e) => setReplyBody(e.target.value)}
+                  onChange={(e) => setReplyBody(e.g.target.value)}
                   rows="5"
                   required
-                  style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
                 />
-                <button type="submit" style={{ marginTop: '0.5rem' }}>
+                <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
                   Post Reply
                 </button>
               </form>

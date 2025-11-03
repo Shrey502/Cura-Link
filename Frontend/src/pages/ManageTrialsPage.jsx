@@ -193,7 +193,11 @@ function ManageTrialsPage() {
         {/* --- COLUMN 2: MY ADDED TRIALS --- */}
         <div className="results-column">
           <h3>My Added Trials</h3>
-          {loading && <p>Loading...</p>}
+          {loading && ( 
+          <div className="spinner-container">
+            <div className="spinner" />
+          </div>
+            )}
           {myTrials.length === 0 && !loading && (
             <p>You have not added any trials yet.</p>
           )}

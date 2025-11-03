@@ -74,7 +74,13 @@ function ChatPage() {
     }
   };
 
-  if (loading) return <div>Loading chat...</div>;
+  if (loading) { // <-- NEW
+    return (
+      <div className="spinner-container">
+        <div className="spinner" />
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: 'auto' }}>
