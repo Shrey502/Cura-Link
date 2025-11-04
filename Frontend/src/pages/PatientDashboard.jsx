@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import api from '../api';
 import ContactModal from '../components/ContactModal';
 
-
 function PatientDashboard() {
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState('');
@@ -30,6 +29,9 @@ function PatientDashboard() {
 
   const [toastMessage, setToastMessage] = useState('');
   const [meetingRequest, setMeetingRequest] = useState(null);
+  
+  // --- NEW: Notifications State ---
+  const [meetingUpdates, setMeetingUpdates] = useState([]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -50,10 +52,24 @@ function PatientDashboard() {
         console.error('Failed to fetch categories', err);
       }
     };
+    
+    // --- Fetches accepted meeting requests ---
+    const fetchMeetingUpdates = async () => {
+      try {
+        const response = await api.get('/meetings/updates');
+        setMeetingUpdates(response.data);
+      } catch (err) {
+        console.error('Failed to fetch meeting updates', err);
+      }
+    };
 
     const loadAllData = async () => {
       setLoading(true);
-      await Promise.all([fetchProfile(), fetchCategories()]);
+      await Promise.all([
+        fetchProfile(), 
+        fetchCategories(),
+        fetchMeetingUpdates() // <-- Fetches notifications
+      ]);
       setLoading(false);
     };
 
@@ -166,12 +182,27 @@ function PatientDashboard() {
     }
   };
 
-  const handleMeetingRequest = (expertName) => {
-    setMeetingRequest({ name: expertName }); // Open the modal
+  // --- UPDATED: Now passes the full expert object ---
+  const handleMeetingRequest = (expert) => {
+    setMeetingRequest(expert); // Open the modal
   };
 
-  const confirmMeetingRequest = () => {
-    showToast(`Meeting request sent to ${meetingRequest.name}!`);
+  // --- UPDATED: Now sends a real API request ---
+  const confirmMeetingRequest = async () => {
+    if (!meetingRequest) return;
+    
+    try {
+      // This is the real API call
+      await api.post('/meetings/request', { researcherId: meetingRequest.user_id });
+      showToast(`Meeting request sent to ${meetingRequest.full_name}!`);
+    } catch (err) {
+       console.error('Failed to send request', err);
+      if (err.response && err.response.status === 409) {
+        showToast('Request already sent.');
+      } else {
+        showToast('Failed to send request.');
+      }
+    }
     setMeetingRequest(null);
   };
 
@@ -189,11 +220,18 @@ function PatientDashboard() {
         {toastMessage && (
           <motion.div
             className="toast-backdrop"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <div className="toast-box">{toastMessage}</div>
+            <motion.div 
+              className="toast-box"
+              initial={{ y: -50 }}
+              animate={{ y: 0 }}
+              exit={{ y: -50 }}
+            >
+              {toastMessage}
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -201,7 +239,7 @@ function PatientDashboard() {
       {meetingRequest && (
         <ContactModal
           title="Request Meeting"
-          message={`Are you sure you want to request a meeting with ${meetingRequest.name}? They will be sent your contact details.`}
+          message={`Are you sure you want to request a meeting with ${meetingRequest.full_name}?`}
           onConfirm={confirmMeetingRequest}
           onCancel={() => setMeetingRequest(null)}
         />
@@ -221,6 +259,34 @@ function PatientDashboard() {
         >
           <h2>Welcome, {profile.full_name}!</h2>
           <p>Your registered conditions: <strong>{profile.conditions?.join(', ')}</strong></p>
+
+          {/* --- NEW: NOTIFICATIONS --- */}
+          <div className="search-box" style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '8px' }}>
+            <h3 style={{ border: 'none', marginBottom: '0.5rem' }}>Notifications</h3>
+            {meetingUpdates.length === 0 ? (
+              <p style={{fontSize: '0.9rem', color: 'var(--text-secondary)'}}>No new updates.</p>
+            ) : (
+              meetingUpdates.map(update => (
+                <div key={update.id} className="result-item" style={{background: 'var(--bg-card)'}}>
+                  <p style={{margin: 0, fontSize: '0.9rem'}}>
+                    Your meeting request with <strong>{update.researcher_name}</strong> was accepted!
+                  </p>
+                  <a href={`mailto:${update.researcher_email}`} className="btn-primary" style={{
+                    fontSize: '0.8rem', 
+                    padding: '0.25rem 0.5rem', 
+                    textDecoration: 'none', 
+                    borderRadius: '4px',
+                    marginTop: '0.5rem',
+                    display: 'inline-block'
+                  }}>
+                    Contact: {update.researcher_email}
+                  </a>
+                </div>
+              ))
+            )}
+          </div>
+          {/* --- END NOTIFICATIONS --- */}
+
 
           <div className="search-box">
             <h3>Search Publications</h3>
@@ -245,7 +311,6 @@ function PatientDashboard() {
                 placeholder="e.g., Glioblastoma"
                 value={trialSearchTerm}
                 onChange={(e) => setTrialSearchTerm(e.target.value)}
-                style={{ flexGrow: 1 }}
               />
               <select
                 className="status-select"
@@ -394,7 +459,13 @@ function PatientDashboard() {
 
               <button onClick={() => handleFavorite(expert.user_id, 'EXPERT')} className="btn btn-secondary" style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}>+ Favorite</button>
 
-              <button onClick={() => handleMeetingRequest(expert.full_name)} className="btn btn-primary" style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', marginLeft: '0.5rem' }}>Request Meeting</button>
+              <button 
+                onClick={() => handleMeetingRequest(expert)} // <-- UPDATED
+                className="btn btn-primary" 
+                style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', marginLeft: '0.5rem' }}
+              >
+                Request Meeting
+              </button>
             </motion.div>
           ))}
 
@@ -405,3 +476,4 @@ function PatientDashboard() {
 }
 
 export default PatientDashboard;
+

@@ -18,6 +18,7 @@ const forumRoutes = require('./routes/forums');
 const trialRoutes = require('./routes/trials');
 const connectionRoutes = require('./routes/connections');
 const chatRoutes = require('./routes/chat');
+const meetingRoutes = require('./routes/meetings');
 
 // --- 3. Use Routes ---
 // Note: We changed the URLs to be simpler!
@@ -29,6 +30,7 @@ app.use('/api/forums', forumRoutes); // e.g., /api/forums
 app.use('/api/trials', trialRoutes); // e.g., /api/trials
 app.use('/api/connections', connectionRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/meetings', meetingRoutes);
 
 // --- 4. Simple Test Route ---
 app.get('/api/test-db', async (req, res) => {
