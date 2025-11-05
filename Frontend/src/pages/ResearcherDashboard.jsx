@@ -708,7 +708,7 @@ function ResearcherDashboard() {
                   </h4>
                   <button
                     onClick={() => handleStartChat(collab.collaborator_id, collab.collaborator_name)}
-                    className="btn btn-primary"
+                    className="btn btn-primary chat-btn"
                   >
                     Chat
                   </button>
