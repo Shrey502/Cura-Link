@@ -19,13 +19,14 @@ function LoginPage() {
   // --- 💡 NEW: State for input focus animations ---
   const [isEmailFocused, setIsEmailFocused] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     try {
-      const response = await axios.post('${API_URL}/api/login', {
+      const response = await axios.post(`${API_URL}/api/login`, {
         email,
         password,
       });

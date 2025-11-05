@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { FaUserPlus } from 'react-icons/fa'; // Import an icon
 import DigitalClock from '../components/DigitalClock'; // Import the clock
+const API_URL = import.meta.env.VITE_API_URL;
 
 function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -24,7 +25,7 @@ function RegisterPage() {
     }
 
     try {
-      const response = await axios.post('${API_URL}/api/register', {
+      const response = await axios.post(`${API_URL}/api/register`, {
         email,
         password,
         role,
