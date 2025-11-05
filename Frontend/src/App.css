@@ -88,9 +88,12 @@ main {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 2rem;
-  background-color: var(--bg-card);
-  border-bottom: 1px solid var(--border-primary);
-  box-shadow: var(--shadow-sm);
+  background-color: var(--background-primary);
+  /* ...all your other existing styles... */
+
+  /* 💡 ADD THESE TWO LINES TO FIX THE LAYERING */
+  position: relative;
+  z-index: 10;
 }
 .nav-links {
   display: flex;
@@ -301,15 +304,42 @@ label {
   padding: 1.5rem;
 }
 
-.results-column::-webkit-scrollbar {
-  width: 6px;
+/* --- Custom Scrollbar Styling (for App.css) --- */
+
+/* Works on Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-glass) var(--background-primary);
 }
-.results-column::-webkit-scrollbar-thumb {
-  background: #3b82f6; /* Blue scrollbar */
-  border-radius: 10px;
+
+/* Works on Chrome, Edge, and Safari */
+* {
+  scrollbar-width: thin;
+  /* Updated to use the more subtle text color */
+  scrollbar-color: var(--text-secondary) var(--background-primary);
 }
-.results-column::-webkit-scrollbar-thumb:hover {
-  background: #2563eb;
+
+/* Works on Chrome, Edge, and Safari */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border-glass);
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  /* 💡 CHANGED THIS: 
+     Now fades to your subtle text color */
+  background-color: var(--text-secondary); 
 }
 
 

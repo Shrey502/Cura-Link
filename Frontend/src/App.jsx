@@ -1,15 +1,16 @@
 import React from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { useTheme } from './context/ThemeContext'; // 1. Import useTheme
-import ThemeToggle from './components/ThemeToggle'; // 2. Import the toggle button
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTheme } from './context/ThemeContext';
+import ThemeToggle from './components/ThemeToggle';
 import './App.css';
 
 function App() {
   const navigate = useNavigate();
-  const { theme } = useTheme(); // 3. Get the current theme
+  const location = useLocation(); // 🧭 Get current route
+  const { theme } = useTheme();
   const token = localStorage.getItem('token');
   
-  // Get user info to show the correct links
+  // Get user info
   let user = null;
   const userString = localStorage.getItem('user');
   if (userString) {
@@ -17,51 +18,56 @@ function App() {
   }
 
   const handleLogout = () => {
-    // Clear all session and local storage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    sessionStorage.clear(); // Clear the dashboard state
+    sessionStorage.clear();
     navigate('/login');
-    window.location.reload(); // Force a refresh to clear state
+    window.location.reload();
   };
 
+  // 🧩 Define paths where the navbar should be hidden
+  const hideNavbarRoutes = ['/chat'];
+
+  // 🧠 Check if current path matches one of them
+  const shouldHideNavbar = hideNavbarRoutes.some(path => location.pathname.startsWith(path));
+
   return (
-    // 4. Apply the theme class to the whole app
     <div className={`app-container ${theme}`}>
-      <nav className="navbar">
-        <div className="nav-links">
-          <Link to="/">Home</Link>
-          
-          {/* Show links based on user role */}
-          {user && user.role === 'PATIENT' && (
-            <>
-              <Link to="/dashboard/patient">My Dashboard</Link>
-              <Link to="/favorites">My Favorites</Link>
-            </>
-          )}
-          
-          {user && user.role === 'RESEARCHER' && (
-            <>
-              <Link to="/dashboard/researcher">My Dashboard</Link>
-              <Link to="/manage-trials">Manage Trials</Link>
-              <Link to="/favorites">My Favorites</Link>
-            </>
-          )}
-        </div>
-        
-        <div className="nav-actions">
-          {token ? (
-            <button onClick={handleLogout} className="btn btn-secondary">Logout</button>
-          ) : (
-            <>
-              <Link to="/login" className="btn btn-secondary">Login</Link>
-              <Link to="/register" className="btn btn-primary">Register</Link>
-            </>
-          )}
-          {/* 5. Add the theme toggle button */}
-          <ThemeToggle />
-        </div>
-      </nav>
+      {/* 🧭 Hide navbar on specific pages */}
+      {!shouldHideNavbar && (
+        <nav className="navbar">
+          <div className="nav-links">
+            <Link to="/">Home</Link>
+
+            {user && user.role === 'PATIENT' && (
+              <>
+                <Link to="/dashboard/patient">My Dashboard</Link>
+                <Link to="/favorites">My Favorites</Link>
+              </>
+            )}
+
+            {user && user.role === 'RESEARCHER' && (
+              <>
+                <Link to="/dashboard/researcher">My Dashboard</Link>
+                <Link to="/manage-trials">Manage Trials</Link>
+                <Link to="/favorites">My Favorites</Link>
+              </>
+            )}
+          </div>
+
+          <div className="nav-actions">
+            {token ? (
+              <button onClick={handleLogout} className="btn btn-secondary">Logout</button>
+            ) : (
+              <>
+                <Link to="/login" className="btn btn-secondary">Login</Link>
+                <Link to="/register" className="btn btn-primary">Register</Link>
+              </>
+            )}
+            <ThemeToggle />
+          </div>
+        </nav>
+      )}
 
       <main>
         <Outlet />
@@ -71,4 +77,3 @@ function App() {
 }
 
 export default App;
-
