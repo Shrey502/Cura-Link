@@ -87,7 +87,7 @@ Detail: A simple wrapper component that checks for the presence of a login token
 
 src/pages/PatientDashboard.jsx
 Function: Patient Primary Workspace.
-Detail: Contains search forms for publications/trials, displays AI-summarized results, and provides the patient's view of the community forum.
+Detail: Contains search forms for publications/trials, displays AI-summarized results, and provides the patient's view of the community forum
 
 src/pages/ResearcherDashboard.jsx
 Function: Researcher Management Workspace.
